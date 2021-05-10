@@ -46,6 +46,10 @@ UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+
+
+int send = 0;
+
 struct IR{
     int    state;   /* AD result of measured voltage */
     int    timer;   /* AD result of measured current */
@@ -66,11 +70,7 @@ void StartDefaultTask(void *argument);
 
 void updateData(){
 
-	int re = 0;
-	if (ir.state == 2) {
-		re = 1;
-	}
-	HAL_UART_Transmit(&huart1,&re,sizeof(re),HAL_MAX_DELAY);
+	HAL_UART_Transmit(&huart1,&(ir.count),sizeof(ir.count),HAL_MAX_DELAY);
 
 }
 
@@ -88,8 +88,15 @@ void checkIR(){
 				ir.state = 2;
 				ir.count = 0;
 				HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
+				if (amount > 0) {
+					ir.count -= 1;
+					send = 1;
+				}
 				HAL_UART_Transmit(&huart2,"s\n\r",strlen("s\n\r"),HAL_MAX_DELAY);
 			}
+		}
+		else {
+			send = 0;
 		}
 	}
 	else {
@@ -140,7 +147,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start_IT(&htim3);
   ir.state = 0;
-  ir.count = 0;
+  ir.count = 10;
   ir.timer = 40000;
   /* USER CODE END 2 */
 
