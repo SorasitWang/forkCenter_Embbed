@@ -42,18 +42,18 @@
 /* Private variables ---------------------------------------------------------*/
 TIM_HandleTypeDef htim3;
 
-UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
+UART_HandleTypeDef huart6;
 
 /* USER CODE BEGIN PV */
 
 
 int send = 0;
 
+const FULL = 40;
 struct IR{
     int    state;   /* AD result of measured voltage */
     int    timer;   /* AD result of measured current */
-    int		count;   /* A counter value               */
 };
 
 struct IR ir;
@@ -63,46 +63,77 @@ struct IR ir;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
-static void MX_USART1_UART_Init(void);
 static void MX_TIM3_Init(void);
+static void MX_USART6_UART_Init(void);
 /* USER CODE BEGIN PFP */
 void StartDefaultTask(void *argument);
-
+int amount=FULL;
+int start = 0;
 void updateData(){
+	/*char ss[3] ="sssa";
+	HAL_UART_Transmit(&huart1,"s",strlen("s"),HAL_MAX_DELAY);*/
 
-	HAL_UART_Transmit(&huart1,&(ir.count),sizeof(ir.count),HAL_MAX_DELAY);
+
+	 //HAL_UART_Transmit(&huart6,&buf,strlen(buf),HAL_MAX_DELAY);
+
 
 }
 
 void checkIR(){
+	int rec = 0;
+	char buf[5];
+	char fill[2];
+	char time[10];
+	if (HAL_UART_Receive(&huart6,&fill,strlen(fill),500)){
+		if (fill[0]=='1'){
+		HAL_UART_Transmit(&huart2,"ok",strlen("ok"),100);
+		rec = 1;
+		amount=FULL;
+		}
+	}
+	if (rec==1){
+		sprintf(buf,"%d,",amount);
+		HAL_UART_Transmit(&huart6,&buf,strlen(buf),100);
+	}
 
-	int found  = (HAL_GPIO_ReadPin (GPIOA, GPIO_PIN_11)==GPIO_PIN_SET);
 
-	if (found == 0){
+
+	int found = 0;
+	if (HAL_GPIO_ReadPin (GPIOA, GPIO_PIN_6)!=GPIO_PIN_SET)
+		found = 1;
+
+	char tmp[10];
+	if (found == 1){
+
 		if (ir.state == 0){
 			ir.state = 1;
+			start = HAL_GetTick();
 		}
 		else if (ir.state == 1){
-			ir.count += 1;
-			if (ir.count > ir.timer){
+
+			if (HAL_GetTick()-start > ir.timer){
 				ir.state = 2;
-				ir.count = 0;
 				HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
-				if (amount > 0) {
-					ir.count -= 1;
+				if (amount > 1) {
+					amount -= 1;
 					send = 1;
+					sprintf(buf,"%d,",amount);
+					HAL_UART_Transmit(&huart2,"send",strlen("send"),HAL_MAX_DELAY);
+				}else{
+					send = 0;
+					sprintf(buf,"999,");
+
 				}
-				HAL_UART_Transmit(&huart2,"s\n\r",strlen("s\n\r"),HAL_MAX_DELAY);
+				HAL_UART_Transmit(&huart6,&buf,strlen(buf),HAL_MAX_DELAY);
+
+
 			}
-		}
-		else {
-			send = 0;
 		}
 	}
 	else {
 		ir.state = 0;
 		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
-		ir.count = 0;
+		send =0;
 	}
 }
 
@@ -142,13 +173,15 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
-  MX_USART1_UART_Init();
   MX_TIM3_Init();
+  MX_USART6_UART_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start_IT(&htim3);
   ir.state = 0;
-  ir.count = 10;
-  ir.timer = 40000;
+  ir.timer = 1800;
+  char buf[5];
+  sprintf(buf,"%d,",amount);
+  HAL_UART_Transmit(&huart6,&buf,strlen(buf),HAL_MAX_DELAY);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -158,7 +191,9 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+
 	checkIR();
+	HAL_Delay(100);
 
   }
   /* USER CODE END 3 */
@@ -186,7 +221,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
   RCC_OscInitStruct.PLL.PLLM = 8;
-  RCC_OscInitStruct.PLL.PLLN = 64;
+  RCC_OscInitStruct.PLL.PLLN = 72;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = 4;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
@@ -198,11 +233,11 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV2;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_1) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
     Error_Handler();
   }
@@ -227,9 +262,9 @@ static void MX_TIM3_Init(void)
 
   /* USER CODE END TIM3_Init 1 */
   htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 32000;
+  htim3.Init.Prescaler = 1000;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 1000;
+  htim3.Init.Period = 7200;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
@@ -250,39 +285,6 @@ static void MX_TIM3_Init(void)
   /* USER CODE BEGIN TIM3_Init 2 */
 
   /* USER CODE END TIM3_Init 2 */
-
-}
-
-/**
-  * @brief USART1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USART1_UART_Init(void)
-{
-
-  /* USER CODE BEGIN USART1_Init 0 */
-
-  /* USER CODE END USART1_Init 0 */
-
-  /* USER CODE BEGIN USART1_Init 1 */
-
-  /* USER CODE END USART1_Init 1 */
-  huart1.Instance = USART1;
-  huart1.Init.BaudRate = 115200;
-  huart1.Init.WordLength = UART_WORDLENGTH_8B;
-  huart1.Init.StopBits = UART_STOPBITS_1;
-  huart1.Init.Parity = UART_PARITY_NONE;
-  huart1.Init.Mode = UART_MODE_TX_RX;
-  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-  if (HAL_UART_Init(&huart1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USART1_Init 2 */
-
-  /* USER CODE END USART1_Init 2 */
 
 }
 
@@ -320,6 +322,39 @@ static void MX_USART2_UART_Init(void)
 }
 
 /**
+  * @brief USART6 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART6_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART6_Init 0 */
+
+  /* USER CODE END USART6_Init 0 */
+
+  /* USER CODE BEGIN USART6_Init 1 */
+
+  /* USER CODE END USART6_Init 1 */
+  huart6.Instance = USART6;
+  huart6.Init.BaudRate = 115200;
+  huart6.Init.WordLength = UART_WORDLENGTH_8B;
+  huart6.Init.StopBits = UART_STOPBITS_1;
+  huart6.Init.Parity = UART_PARITY_NONE;
+  huart6.Init.Mode = UART_MODE_TX_RX;
+  huart6.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart6.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart6) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART6_Init 2 */
+
+  /* USER CODE END USART6_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -350,8 +385,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PA11 */
-  GPIO_InitStruct.Pin = GPIO_PIN_11;
+  /*Configure GPIO pins : PA6 PA11 */
+  GPIO_InitStruct.Pin = GPIO_PIN_6|GPIO_PIN_11;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
