@@ -70,31 +70,25 @@ void StartDefaultTask(void *argument);
 int amount=FULL;
 int start = 0;
 void updateData(){
-	/*char ss[3] ="sssa";
-	HAL_UART_Transmit(&huart1,"s",strlen("s"),HAL_MAX_DELAY);*/
 
+	char buf[5];
+	if (amount > 0) {
+		sprintf(buf,"%d,",amount);
+	}else{
+		sprintf(buf,"999,");
+	}
+	HAL_UART_Transmit(&huart6,&buf,strlen(buf),100);
 
-	 //HAL_UART_Transmit(&huart6,&buf,strlen(buf),HAL_MAX_DELAY);
 
 
 }
 
 void checkIR(){
-	int rec = 0;
-	char buf[5];
-	char fill[2];
+
+
+
 	char time[10];
-	if (HAL_UART_Receive(&huart6,&fill,strlen(fill),500)){
-		if (fill[0]=='1'){
-		HAL_UART_Transmit(&huart2,"ok",strlen("ok"),100);
-		rec = 1;
-		amount=FULL;
-		}
-	}
-	if (rec==1){
-		sprintf(buf,"%d,",amount);
-		HAL_UART_Transmit(&huart6,&buf,strlen(buf),100);
-	}
+
 
 
 
@@ -114,17 +108,15 @@ void checkIR(){
 			if (HAL_GetTick()-start > ir.timer){
 				ir.state = 2;
 				HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
-				if (amount > 1) {
+				if (amount > 0) {
 					amount -= 1;
 					send = 1;
-					sprintf(buf,"%d,",amount);
-					HAL_UART_Transmit(&huart2,"send",strlen("send"),HAL_MAX_DELAY);
+					HAL_GPIO_WritePin(GPIOA, 5, GPIO_PIN_SET);
 				}else{
 					send = 0;
-					sprintf(buf,"999,");
-
+					HAL_GPIO_WritePin(GPIOA, 5, GPIO_PIN_RESET);
 				}
-				HAL_UART_Transmit(&huart6,&buf,strlen(buf),HAL_MAX_DELAY);
+
 
 
 			}
@@ -191,8 +183,22 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	 int rec = 0;
+	 char fill[2];
 
+	  if (HAL_UART_Receive(&huart6,&fill,strlen(fill),100)){
+	  		if (fill[0]=='1'){
+	  			HAL_UART_Transmit(&huart2,"ok",strlen("ok"),100);
+	  			rec = 1;
+	  			amount=FULL;
+	  		}
+	  }
+	  if (rec==1){
+	  	sprintf(buf,"%d,",amount);
+	  	HAL_UART_Transmit(&huart6,&buf,strlen(buf),100);
+	  }
 	checkIR();
+
 	HAL_Delay(100);
 
   }
@@ -262,7 +268,7 @@ static void MX_TIM3_Init(void)
 
   /* USER CODE END TIM3_Init 1 */
   htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 1000;
+  htim3.Init.Prescaler = 10000;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim3.Init.Period = 7200;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -397,7 +403,7 @@ static void MX_GPIO_Init(void)
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	//update every 20 second
 	updateData();
-	HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+
 
 }
 /* USER CODE END 4 */
