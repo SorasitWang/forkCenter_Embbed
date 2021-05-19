@@ -50,7 +50,7 @@ UART_HandleTypeDef huart6;
 
 int send = 0;
 
-const FULL = 40;
+const FULL = 3;
 struct IR{
     int    state;   /* AD result of measured voltage */
     int    timer;   /* AD result of measured current */
@@ -107,14 +107,13 @@ void checkIR(){
 
 			if (HAL_GetTick()-start > ir.timer){
 				ir.state = 2;
-				HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
 				if (amount > 0) {
 					amount -= 1;
 					send = 1;
-					HAL_GPIO_WritePin(GPIOA, 5, GPIO_PIN_SET);
+					HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
 				}else{
 					send = 0;
-					HAL_GPIO_WritePin(GPIOA, 5, GPIO_PIN_RESET);
+					HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
 				}
 
 
@@ -186,12 +185,14 @@ int main(void)
 	 int rec = 0;
 	 char fill[2];
 
-	  if (HAL_UART_Receive(&huart6,&fill,strlen(fill),100)){
-	  		if (fill[0]=='1'){
+	  if (HAL_UART_Receive(&huart6,&fill,strlen(fill),1000)==HAL_OK){
+	  		//if (fill[0]=='1'){
 	  			HAL_UART_Transmit(&huart2,"ok",strlen("ok"),100);
+	  			HAL_UART_Transmit(&huart2,fill,strlen(fill),100);
 	  			rec = 1;
-	  			amount=FULL;
-	  		}
+	  			amount+=atoi(fill);
+	  			//fill[0] = '9';
+	  		//}
 	  }
 	  if (rec==1){
 	  	sprintf(buf,"%d,",amount);
